@@ -42,10 +42,15 @@ TARGET is either:
       ~/.config/minato/age.key or /etc/minato/age.key.
   a stack name (blog)                        edited by the server through the API
       (local socket or "minato login"). The server decrypts with its own key,
-      commits, pushes to git and redeploys: no age key needed on your laptop.`,
+      commits, pushes to git and redeploys: no age key needed on your laptop.
+  @shared                                    the shared file of the repository
+      (secrets.enc.yml at the root), through the API like a stack. Every stack
+      can use its values, unless its own file defines the same key.`,
 		Example: `  minato secrets set blog DB_PASSWORD --random 32      # on the server, through the API
+  minato secrets set @shared POSTGRES_PASSWORD           # shared by every stack
   minato secrets ls blog
-  minato secrets edit stacks/blog/secrets.enc.yml        # local working copy`,
+  minato secrets edit stacks/blog/secrets.enc.yml        # local working copy
+  minato secrets set secrets.enc.yml POSTGRES_PASSWORD   # local shared file`,
 	}
 	cmd.PersistentFlags().StringArrayVar(&o.recipients, "recipient", nil, "age or ssh public key for local files (repeatable, overrides .minato.yml)")
 	cmd.AddCommand(o.keygen(), o.pubkey(), o.set(), o.get(), o.unset(), o.list(), o.show(), o.edit(), o.encrypt(), o.rotate())

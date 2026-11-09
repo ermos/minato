@@ -36,33 +36,44 @@ type SecretsInfo struct {
 	Rev        string            `json:"rev,omitempty"`
 }
 
-func (d *Daemon) loadRepoStack(name string) (*stack.Stack, *config.RepoSpec, error) {
-	spec, err := config.LoadRepoSpec(d.cfg.Repo.Dir)
+// SharedTarget designates the shared secret file of the repository instead of
+// a stack.
+const SharedTarget = "@shared"
+
+// secretsFile resolves the secret file of a stack, or of the repository for
+// SharedTarget. file is the path relative to the repository root.
+func (d *Daemon) secretsFile(name string) (path, file string, spec *config.RepoSpec, err error) {
+	spec, err = config.LoadRepoSpec(d.cfg.Repo.Dir)
 	if err != nil {
-		return nil, nil, err
+		return "", "", nil, err
 	}
-	if !servicePat.MatchString(name) || strings.HasPrefix(name, ".") {
-		return nil, nil, fmt.Errorf("invalid stack name %q", name)
+	if name == SharedTarget {
+		path = spec.SharedSecretsFile(d.cfg.Repo.Dir)
+	} else {
+		if !servicePat.MatchString(name) || strings.HasPrefix(name, ".") {
+			return "", "", nil, fmt.Errorf("invalid stack name %q", name)
+		}
+		st, err := stack.Load(filepath.Join(d.cfg.Repo.Dir, spec.StacksDir, name))
+		if err != nil {
+			return "", "", nil, fmt.Errorf("stack %s: %w", name, err)
+		}
+		path = filepath.Join(st.Dir, st.Spec.Secrets)
 	}
-	st, err := stack.Load(filepath.Join(d.cfg.Repo.Dir, spec.StacksDir, name))
-	if err != nil {
-		return nil, nil, fmt.Errorf("stack %s: %w", name, err)
-	}
-	return st, spec, nil
+	file, _ = filepath.Rel(d.cfg.Repo.Dir, path)
+	return path, file, spec, nil
 }
 
 // ReadSecrets lists the secrets of a stack, with values when asked.
 func (d *Daemon) ReadSecrets(name string, values bool) (*SecretsInfo, error) {
-	st, _, err := d.loadRepoStack(name)
+	path, file, _, err := d.secretsFile(name)
 	if err != nil {
 		return nil, err
 	}
-	info := &SecretsInfo{Stack: name, File: st.Spec.Secrets, Keys: []string{}}
-	path := st.SecretsPath()
-	if path == "" {
+	info := &SecretsInfo{Stack: name, File: file, Keys: []string{}}
+	e, err := secrets.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
 		return info, nil
 	}
-	e, err := secrets.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -101,11 +112,10 @@ func (d *Daemon) ChangeSecrets(ctx context.Context, user, name string, ch Secret
 	if _, err := d.repo.Sync(ctx); err != nil {
 		return nil, err
 	}
-	st, spec, err := d.loadRepoStack(name)
+	path, file, spec, err := d.secretsFile(name)
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(st.Dir, st.Spec.Secrets)
 	recipients := d.recipients(spec)
 
 	var s *secrets.Secrets
@@ -119,7 +129,7 @@ func (d *Daemon) ChangeSecrets(ctx context.Context, user, name string, ch Secret
 		return nil, err
 	default:
 		if s, err = secrets.Open(e, d.ids); err != nil {
-			return nil, fmt.Errorf("the server key cannot decrypt %s: %w", st.Spec.Secrets, err)
+			return nil, fmt.Errorf("the server key cannot decrypt %s: %w", file, err)
 		}
 	}
 
@@ -160,10 +170,13 @@ func (d *Daemon) ChangeSecrets(ctx context.Context, user, name string, ch Secret
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return nil, err
 	}
-	rel, _ := filepath.Rel(d.cfg.Repo.Dir, path)
-	msg := fmt.Sprintf("chore(secrets): update %s secrets\n\n%s\n\nDone by %s through minato.", name, strings.Join(summary, "\n"), user)
+	what := name
+	if name == SharedTarget {
+		what = "shared"
+	}
+	msg := fmt.Sprintf("chore(secrets): update %s secrets\n\n%s\n\nDone by %s through minato.", what, strings.Join(summary, "\n"), user)
 	host, _ := os.Hostname()
-	rev, err := d.repo.CommitAndPush(ctx, rel, msg, user, user+"@"+host)
+	rev, err := d.repo.CommitAndPush(ctx, file, msg, user, user+"@"+host)
 	if err != nil {
 		// Drop the local commit so the checkout matches the remote again.
 		_, _ = d.repo.Sync(ctx)
@@ -177,5 +190,5 @@ func (d *Daemon) ChangeSecrets(ctx context.Context, user, name string, ch Secret
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	return &SecretsInfo{Stack: name, File: st.Spec.Secrets, Keys: keys, Recipients: s.Recipients(), Rev: rev}, nil
+	return &SecretsInfo{Stack: name, File: file, Keys: keys, Recipients: s.Recipients(), Rev: rev}, nil
 }

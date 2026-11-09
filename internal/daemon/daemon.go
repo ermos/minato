@@ -208,9 +208,10 @@ func (d *Daemon) Sync(ctx context.Context, force bool) (*SyncReport, error) {
 	for _, st := range stacks {
 		present[st.Name] = true
 		b, err := render.Build(st, render.Options{
-			OutDir:     filepath.Join(d.cfg.StacksDir(), st.Name),
-			Identities: d.ids,
-			HostEnv:    hostEnv(),
+			OutDir:        filepath.Join(d.cfg.StacksDir(), st.Name),
+			Identities:    d.ids,
+			HostEnv:       hostEnv(),
+			SharedSecrets: repoSpec.SharedSecretsPath(d.cfg.Repo.Dir),
 		})
 		if err != nil {
 			report.Failed = append(report.Failed, st.Name)

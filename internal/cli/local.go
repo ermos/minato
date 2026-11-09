@@ -50,6 +50,13 @@ file currently rendered by the daemon is printed.`,
 				return err
 			}
 			opts := render.Options{OutDir: out, HostEnv: environ(), Redact: !showSecrets}
+			if root, ok := config.FindRepoRoot(st.Dir); ok {
+				spec, err := config.LoadRepoSpec(root)
+				if err != nil {
+					return err
+				}
+				opts.SharedSecrets = spec.SharedSecretsPath(root)
+			}
 			if opts.OutDir == "" {
 				opts.OutDir = filepath.Join(config.DefaultDataDir, "stacks", st.Name)
 			}
@@ -114,11 +121,25 @@ func validateCmd() *cobra.Command {
 				return err
 			}
 			failed := len(loadErrs)
+			shared := spec.SharedSecretsPath(root)
+			if shared != "" && len(spec.Secrets.Recipients) > 0 {
+				if e, err := secrets.ReadFile(shared); err != nil {
+					failed++
+					fmt.Printf("✘ %s: %v\n", filepath.Base(shared), err)
+				} else if !sameSet(e.Meta.Recipients, spec.Secrets.Recipients) {
+					fmt.Printf("  ! %s recipients differ from %s, run: minato secrets rotate %s\n",
+						filepath.Base(shared), config.RepoFileName, shared)
+				}
+			}
 			for name, e := range loadErrs {
 				fmt.Printf("✘ %s: %v\n", name, e)
 			}
 			for _, st := range stacks {
-				_, err := render.Build(st, render.Options{OutDir: "/var/lib/minato/stacks/" + st.Name, Redact: true})
+				_, err := render.Build(st, render.Options{
+					OutDir:        "/var/lib/minato/stacks/" + st.Name,
+					Redact:        true,
+					SharedSecrets: shared,
+				})
 				if err != nil {
 					failed++
 					fmt.Printf("✘ %s: %v\n", st.Name, err)
