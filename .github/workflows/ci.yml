@@ -1,33 +1,56 @@
 name: ci
+
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "files not formatted with gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.11
+
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - run: go test ./...
-      - uses: golangci/golangci-lint-action@v8
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: test
+      - run: go test -race ./...
+      - name: validate the example repository
+        run: go run ./cmd/minato validate examples/infra
+
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - run: make build-linux VERSION=${GITHUB_REF_NAME}
-      - run: gh release create "$GITHUB_REF_NAME" bin/* --generate-notes
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: build --snapshot --clean

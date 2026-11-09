@@ -1,0 +1,31 @@
+version: 2
+
+project_name: minato
+
+builds:
+  - id: minato
+    main: ./cmd/minato
+    binary: minato
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/ermos/minato/internal/cli.Version={{ .Tag }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+# Raw binaries named minato-<os>-<arch>, as expected by install.sh.
+archives:
+  - formats: [binary]
+    name_template: "minato-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+# release-please writes the release notes, GoReleaser only uploads assets.
+changelog:
+  disable: true
+
+release:
+  mode: keep-existing
