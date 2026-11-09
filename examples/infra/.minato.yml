@@ -1,0 +1,8 @@
+# Repository level settings.
+stacks_dir: stacks
+secrets:
+  # Everyone able to decrypt: the server key (printed by `minato server info`) and your
+  # own keys (`minato secrets keygen`). Run `minato secrets rotate` after a change.
+  # This demo key is throwaway: replace it with yours.
+  recipients:
+    - age15xquqysqft4wzlvc2qj7m4a0vj2k2kwphlhske4szc4qgmyh6p7qrd6hgn
