@@ -358,6 +358,10 @@ Remote access
 Server administration (on the VPS, as root)
   minato server init | run | info
   minato user add | ls | rm | passwd | role | key add | key rm
+
+Updates
+  minato update [--check] [--version V]   install the latest release, restart the service
+  minato update auto on|off|status        daily automatic updates (systemd timer, same major)
 ```
 
 ## How reconciliation works

@@ -34,6 +34,7 @@ WITH_SWARM=true
 SWARM_ADDR=""
 DOCKER_HARDENING=true
 WITH_MINATO=true
+AUTO_UPDATE=true
 MINATO_VERSION="${MINATO_VERSION:-}"
 MINATO_BINARY=""
 REPO=""
@@ -78,6 +79,8 @@ Docker
 
 Minato
   --no-minato              do not install Minato.
+  --no-auto-update         do not update Minato automatically (by default a daily
+                           systemd timer installs new releases of the same major).
   --minato-version VER     version to install, e.g. v0.1.0 (default: latest release).
   --minato-binary PATH     install this binary instead of downloading a release.
   --repo URL               GitOps repository: runs `minato server init` with a
@@ -120,6 +123,7 @@ parse_args() {
       --swarm-addr) need_value "$@"; SWARM_ADDR="$2"; shift 2 ;;
       --no-docker-hardening) DOCKER_HARDENING=false; shift ;;
       --no-minato) WITH_MINATO=false; shift ;;
+      --no-auto-update) AUTO_UPDATE=false; shift ;;
       --minato-version) need_value "$@"; MINATO_VERSION="$2"; shift 2 ;;
       --minato-binary) need_value "$@"; MINATO_BINARY="$2"; shift 2 ;;
       --repo) need_value "$@"; REPO="$2"; shift 2 ;;
@@ -701,6 +705,21 @@ setup_swarm() {
 # Minato
 # ---------------------------------------------------------------------------
 
+# Daily automatic updates of Minato, through `minato update auto`.
+setup_minato_auto_update() {
+  if ! /usr/local/bin/minato update auto --help >/dev/null 2>&1; then
+    warn "this Minato version cannot update itself, automatic updates skipped"
+    return
+  fi
+  if [[ "$AUTO_UPDATE" == true ]]; then
+    /usr/local/bin/minato update auto on --at 05:00 >/dev/null
+    info "automatic updates every day around 05:00 (same major version)"
+  else
+    /usr/local/bin/minato update auto off >/dev/null
+    info "automatic updates off"
+  fi
+}
+
 setup_minato() {
   [[ "$WITH_MINATO" == true ]] || return 0
   step "Minato"
@@ -711,6 +730,7 @@ setup_minato() {
       | MINATO_VERSION="$MINATO_VERSION" sh >/dev/null
   fi
   info "$(/usr/local/bin/minato --version)"
+  setup_minato_auto_update
 
   [[ -n "$REPO" ]] || return 0
   if [[ -f /etc/minato/config.yml ]]; then

@@ -51,6 +51,17 @@ Local socket on the server, or the current remote.
 | `minato remote use NAME` | change the current remote |
 | `minato remote rm NAME` | forget a remote |
 
+## Updates
+
+| Command | Effect |
+| --- | --- |
+| `minato update --check` | tell whether a newer release exists |
+| `minato update` | install the latest release, checked against its checksums, and restart the service on a server |
+| `minato update --version v0.2.0` | install a precise version |
+| `minato update auto on [--at 05:00]` | daily automatic updates with a systemd timer, never across a major version |
+| `minato update auto off` | stop automatic updates |
+| `minato update auto status` | show whether automatic updates are on and the next check |
+
 ## Server administration
 
 On the server, as root.
