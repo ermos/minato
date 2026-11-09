@@ -25,13 +25,18 @@ git push -u origin main
 
 ## 2. Set up the server
 
-On a freshly created VPS, the [bootstrap script](vps-bootstrap.md) does
-everything below, and also upgrades and hardens the server and installs Docker:
+On a freshly created VPS, the [bootstrap script](vps-bootstrap.mdx) does
+everything below, and also upgrades and hardens the server and installs Docker.
+Its page builds the command for your options:
 
 ```bash
 curl -fsSL https://ermos.github.io/minato/bootstrap.sh -o bootstrap.sh
-sudo bash bootstrap.sh --user you --repo git@github.com:you/infra.git
+sudo bash bootstrap.sh --user you --repo git@github.com:you/infra.git \
+     --domain minato.example.com
 ```
+
+With a domain, route it to `127.0.0.1:7373` from your reverse proxy, see
+[reaching Minato from outside](vps-bootstrap.mdx#reaching-minato-from-outside).
 
 On a server that already runs Docker:
 
@@ -54,7 +59,9 @@ starts the `minato` systemd service. It prints three things to copy:
 ## 3. Work from your laptop
 
 ```bash
-minato login vps.example.com -u you      # pins the self-signed certificate
+minato login https://minato.example.com -u you
+# or, without a domain and with port 7373 open:
+# minato login vps.example.com -u you   (pins the self-signed certificate)
 minato status
 minato secrets set hello HOOK_TOKEN --random 32
 minato logs hello -f

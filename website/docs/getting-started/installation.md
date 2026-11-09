@@ -10,7 +10,7 @@ it remotely.
 
 :::tip Fresh VPS
 
-On a server you just created, use the [bootstrap script](vps-bootstrap.md)
+On a server you just created, use the [bootstrap script](vps-bootstrap.mdx)
 instead: it upgrades and hardens the system, and installs Docker, Swarm and
 Minato in one go.
 

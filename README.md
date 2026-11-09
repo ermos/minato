@@ -40,13 +40,15 @@ cd infra && git remote add origin git@github.com:you/infra.git && git push -u or
 ```
 
 On a freshly created VPS, one script upgrades and hardens the system (SSH keys
-only, firewall that also covers container ports, fail2ban, automatic security
-updates, kernel settings) and installs Docker, Swarm and Minato. See the
-[fresh VPS setup](https://ermos.github.io/minato/docs/getting-started/vps-bootstrap).
+only, firewall, fail2ban, automatic security updates, kernel settings) and
+installs Docker, Swarm and Minato. The
+[fresh VPS setup](https://ermos.github.io/minato/docs/getting-started/vps-bootstrap)
+page builds the command for your options.
 
 ```sh
 curl -fsSL https://ermos.github.io/minato/bootstrap.sh -o bootstrap.sh
-sudo bash bootstrap.sh --user you --repo git@github.com:you/infra.git
+sudo bash bootstrap.sh --user you --repo git@github.com:you/infra.git \
+     --domain minato.example.com   # served by your reverse proxy
 ```
 
 On a server that already runs Docker:

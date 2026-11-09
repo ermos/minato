@@ -24,6 +24,8 @@ ADMIN_USER=""
 SSH_KEYS=()
 SSH_PORT=22
 EXTRA_PORTS=()
+FILTER_DOCKER_PORTS=false
+OPEN_API_PORT=false
 TIMEZONE="UTC"
 SWAP_SIZE="auto"
 REBOOT_TIME="04:00"
@@ -52,8 +54,13 @@ Access
                            Repeatable. Default: the keys of root (and of the sudo user).
   --ssh-port PORT          SSH port (default 22).
   --allow-port PORT[/tcp|udp]
-                           open another port in the firewall, repeatable.
-                           80 and 443 are always open.
+                           open a port of the server in the firewall, repeatable.
+                           Only SSH is open otherwise. Needed for services listening
+                           on the host itself, like a reverse proxy in host network
+                           mode (--allow-port 80/tcp --allow-port 443/tcp).
+  --filter-docker-ports    also apply the firewall to ports published by containers:
+                           only --allow-port ones stay reachable. By default the
+                           `ports:` of your compose files decide, as Docker does.
 
 System
   --timezone TZ            time zone (default UTC).
@@ -76,8 +83,14 @@ Minato
   --repo URL               GitOps repository: runs `minato server init` with a
                            generated deploy key, the admin user and systemd.
   --branch NAME            branch to track (default main).
-  --domain NAME            domain name of the Minato API.
-  --tls MODE               self-signed (default), acme or off.
+  --domain NAME            domain name of the Minato API and webhooks. The API then
+                           listens on 127.0.0.1:7373 (--tls off): route the domain
+                           to it from your reverse proxy.
+  --tls MODE               off (default with --domain), self-signed (default
+                           without), or acme (Minato gets a Let's Encrypt
+                           certificate itself and opens 80 and 443).
+  --open-api-port          open port 7373 to reach the API directly, without a domain.
+                           Closed by default: use a domain or an SSH tunnel.
 
   -h, --help               show this help.
 EOF
@@ -97,6 +110,8 @@ parse_args() {
       --ssh-key) need_value "$@"; SSH_KEYS+=("$2"); shift 2 ;;
       --ssh-port) need_value "$@"; SSH_PORT="$2"; shift 2 ;;
       --allow-port) need_value "$@"; EXTRA_PORTS+=("$2"); shift 2 ;;
+      --filter-docker-ports) FILTER_DOCKER_PORTS=true; shift ;;
+      --open-api-port) OPEN_API_PORT=true; shift ;;
       --timezone) need_value "$@"; TIMEZONE="$2"; shift 2 ;;
       --swap) need_value "$@"; SWAP_SIZE="$2"; shift 2 ;;
       --reboot-time) need_value "$@"; REBOOT_TIME="$2"; shift 2 ;;
@@ -155,6 +170,9 @@ preflight() {
   case "${TLS:-self-signed}" in self-signed|acme|off) ;; *) die "invalid --tls $TLS" ;; esac
   [[ -z "$TLS$DOMAIN$BRANCH" || -n "$REPO" ]] || die "--domain, --tls and --branch need --repo"
   [[ "$TLS" != acme || -n "$DOMAIN" ]] || die "--tls acme needs --domain"
+  # With a domain, the reverse proxy of the server handles TLS by default.
+  [[ -z "$DOMAIN" || -n "$TLS" ]] || TLS=off
+  [[ "$OPEN_API_PORT" == false || "$TLS" != off ]] || die "--open-api-port is useless with --tls off (the API listens on 127.0.0.1)"
   [[ -z "$MINATO_BINARY" || -f "$MINATO_BINARY" ]] || die "$MINATO_BINARY not found"
   [[ -e "/usr/share/zoneinfo/$TIMEZONE" ]] || die "unknown time zone $TIMEZONE"
 
@@ -465,9 +483,9 @@ setup_apparmor() {
 # ---------------------------------------------------------------------------
 
 # Docker publishes ports with its own iptables rules, before the ones of UFW:
-# without this block a published port is reachable even if UFW denies it.
-# New connections from outside to containers are dropped, except on the host
-# ports opened here (80, 443 and --allow-port), matched on the port the client
+# a published port is reachable even if UFW denies it. With
+# --filter-docker-ports, this block drops new connections from outside to
+# containers, except on the --allow-port ports, matched on the port the client
 # connected to, before Docker's translation. Adapted from
 # https://github.com/chaifeng/ufw-docker (GPL v3).
 ufw_docker_rules() {
@@ -483,7 +501,7 @@ ufw_docker_rules() {
 -A DOCKER-USER -m conntrack --ctstate INVALID -j DROP
 -A DOCKER-USER -i docker0 -o docker0 -j ACCEPT
 '
-  for spec in 80/tcp 443/tcp "${EXTRA_PORTS[@]}"; do
+  for spec in "${EXTRA_PORTS[@]}"; do
     port="${spec%/*}"
     protos="tcp udp"
     [[ "$spec" != */* ]] || protos="${spec#*/}"
@@ -511,28 +529,73 @@ COMMIT
 # END UFW AND DOCKER (minato)'
 }
 
+# Comment of every UFW rule added by this script: each run deletes them and
+# recreates the ones the options ask for, so the firewall follows the last run.
+readonly UFW_TAG="minato-bootstrap"
+
+# Prints the TLS mode of the Minato API: the existing configuration wins over
+# the options, which only apply to a first server init.
+api_tls_mode() {
+  if [[ -f /etc/minato/config.yml ]]; then
+    sed -n 's/^  tls: *"\{0,1\}\([a-z-]*\)"\{0,1\}.*/\1/p' /etc/minato/config.yml | head -n1
+  elif [[ "$WITH_MINATO" == true && -n "$REPO" ]]; then
+    echo "${TLS:-self-signed}"
+  fi
+}
+
 setup_firewall() {
   step "Firewall"
   local p
   for p in "${EXTRA_PORTS[@]}"; do
     [[ "$p" =~ ^[0-9]+(/(tcp|udp))?$ ]] || die "invalid --allow-port $p"
   done
+
+  # Delete the rules of a previous run, last first so the numbers stay valid.
+  local n
+  while read -r n; do
+    ufw --force delete "$n" >/dev/null
+  done < <(ufw status numbered 2>/dev/null | grep "# $UFW_TAG" | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn)
+
   ufw default deny incoming >/dev/null
   ufw default allow outgoing >/dev/null
-  ufw limit "$SSH_PORT/tcp" comment ssh >/dev/null
-  ufw allow 80/tcp comment http >/dev/null
-  ufw allow 443/tcp comment https >/dev/null
+  ufw limit "$SSH_PORT/tcp" comment "$UFW_TAG ssh" >/dev/null
+  local open="${SSH_PORT}/tcp (SSH, rate limited)"
   for p in "${EXTRA_PORTS[@]}"; do
-    ufw allow "$p" >/dev/null
+    ufw allow "$p" comment "$UFW_TAG" >/dev/null
+    open+=", $p"
   done
+  case "$(api_tls_mode)" in
+    acme)
+      ufw allow 80/tcp comment "$UFW_TAG minato acme" >/dev/null
+      ufw allow 443/tcp comment "$UFW_TAG minato" >/dev/null
+      open+=", 80/tcp and 443/tcp (Minato, Let's Encrypt)" ;;
+    off)
+      [[ "$OPEN_API_PORT" == false ]] || warn "--open-api-port ignored: Minato listens on 127.0.0.1 (tls off)" ;;
+    *)
+      if [[ "$OPEN_API_PORT" == true ]]; then
+        ufw allow 7373/tcp comment "$UFW_TAG minato" >/dev/null
+        open+=", 7373/tcp (Minato)"
+      fi ;;
+  esac
 
-  # Rewrite the Docker block on every run so the open ports stay in sync.
+  # Rewrite the Docker block on every run so it follows the options.
+  local had_block=false
+  if grep -q '^# BEGIN UFW AND DOCKER (minato)$' /etc/ufw/after.rules; then had_block=true; fi
   sed -i '/^# BEGIN UFW AND DOCKER (minato)$/,/^# END UFW AND DOCKER (minato)$/d' /etc/ufw/after.rules
-  printf '%s\n' "$(ufw_docker_rules)" >> /etc/ufw/after.rules
+  if [[ "$FILTER_DOCKER_PORTS" == true ]]; then
+    printf '%s\n' "$(ufw_docker_rules)" >> /etc/ufw/after.rules
+  elif [[ "$had_block" == true ]]; then
+    # ufw reload leaves the rules it no longer declares in place.
+    iptables -F DOCKER-USER 2>/dev/null || true
+  fi
   ufw --force enable >/dev/null
   ufw reload >/dev/null
-  info "deny incoming, allow ${SSH_PORT}/tcp (rate limited), 80, 443${EXTRA_PORTS[*]:+, ${EXTRA_PORTS[*]}}"
-  info "ports published by containers follow the same rules"
+  info "deny incoming, allow $open"
+  if [[ "$FILTER_DOCKER_PORTS" == true ]]; then
+    info "container ports: only the --allow-port ones are reachable"
+  else
+    info "container ports: the ports: of your compose files decide"
+  fi
 }
 
 setup_fail2ban() {
@@ -664,9 +727,19 @@ setup_minato() {
   for k in "${KEYS[@]:1}"; do
     /usr/local/bin/minato user key add "$ADMIN_USER" "$k" >/dev/null
   done
-  # self-signed and files listen on 7373, acme on 443 (open), off on localhost.
   case "${TLS:-self-signed}" in
-    self-signed) ufw allow 7373/tcp comment minato >/dev/null; info "port 7373 open for the Minato API and webhooks" ;;
+    off)
+      info "API and webhooks on http://127.0.0.1:7373: route https://$DOMAIN to it from your reverse proxy" ;;
+    acme)
+      ufw allow 80/tcp comment "$UFW_TAG minato acme" >/dev/null
+      ufw allow 443/tcp comment "$UFW_TAG minato" >/dev/null
+      info "API and webhooks on https://$DOMAIN, ports 80 and 443 open" ;;
+    *)
+      if [[ "$OPEN_API_PORT" == true ]]; then
+        info "API and webhooks on port 7373, open"
+      else
+        info "API on port 7373, closed: use a domain, --open-api-port or an SSH tunnel"
+      fi ;;
   esac
 }
 
@@ -685,8 +758,9 @@ summary() {
   if [[ "$WITH_MINATO" == true && -z "$REPO" ]]; then
     info "Then set up Minato:"
     info "    sudo minato server init --repo git@github.com:you/infra.git --generate-ssh-key \\"
+    info "         --domain minato.example.com --tls off \\"
     info "         --admin $ADMIN_USER --admin-ssh-key @~/.ssh/authorized_keys --no-password --systemd"
-    info "    sudo ufw allow 7373/tcp   # remote API and webhooks"
+    info "and route https://minato.example.com to http://127.0.0.1:7373 from your reverse proxy."
     info ""
   fi
   info "Full log: $LOG_FILE"

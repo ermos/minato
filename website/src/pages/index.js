@@ -232,7 +232,8 @@ git push -u origin main`}</code>
             <pre>
               <code>{`curl -fsSL https://ermos.github.io/minato/bootstrap.sh -o bootstrap.sh
 sudo bash bootstrap.sh --user you \\
-  --repo git@github.com:you/infra.git`}</code>
+  --repo git@github.com:you/infra.git \\
+  --domain minato.example.com`}</code>
             </pre>
           </figure>
         </div>
