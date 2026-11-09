@@ -8,7 +8,7 @@ const sidebars = {
       type: 'category',
       label: 'Getting started',
       collapsed: false,
-      items: ['getting-started/installation', 'getting-started/quick-start'],
+      items: ['getting-started/installation', 'getting-started/quick-start', 'getting-started/vps-bootstrap'],
     },
     {
       type: 'category',

@@ -43,6 +43,12 @@ jobs:
       - name: validate the example repository
         run: go run ./cmd/minato validate examples/infra
 
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: shellcheck -x install.sh website/static/bootstrap.sh
+
   build:
     runs-on: ubuntu-latest
     steps:

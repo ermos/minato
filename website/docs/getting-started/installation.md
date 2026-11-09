@@ -8,6 +8,14 @@ Minato is one static binary for Linux and macOS (amd64 and arm64). Install it
 on the server that runs your stacks, and on your laptop if you want to manage
 it remotely.
 
+:::tip Fresh VPS
+
+On a server you just created, use the [bootstrap script](vps-bootstrap.md)
+instead: it upgrades and hardens the system, and installs Docker, Swarm and
+Minato in one go.
+
+:::
+
 ## Install script
 
 ```bash

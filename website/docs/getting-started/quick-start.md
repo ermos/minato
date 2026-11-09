@@ -25,6 +25,16 @@ git push -u origin main
 
 ## 2. Set up the server
 
+On a freshly created VPS, the [bootstrap script](vps-bootstrap.md) does
+everything below, and also upgrades and hardens the server and installs Docker:
+
+```bash
+curl -fsSL https://ermos.github.io/minato/bootstrap.sh -o bootstrap.sh
+sudo bash bootstrap.sh --user you --repo git@github.com:you/infra.git
+```
+
+On a server that already runs Docker:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ermos/minato/main/install.sh | sudo sh
 sudo minato server init --repo git@github.com:you/infra.git --generate-ssh-key \
