@@ -1,0 +1,10 @@
+vars:
+  NAME: whoami-on-${env.HOSTNAME:-server}
+env:
+  WHOAMI_TAG: v1.10
+webhooks:
+  # POST /hooks/whoami/update?token=... from the CI after pushing an image
+  update:
+    action: pull
+    services: [whoami]
+    token: ${secrets.HOOK_TOKEN}

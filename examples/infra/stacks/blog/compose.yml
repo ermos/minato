@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: blog
+      POSTGRES_DB: blog
+      # Read from a file written by minato, never in clear in `docker inspect`.
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  web:
+    image: ghcr.io/me/blog:${TAG}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SMTP_PASSWORD: ${secrets.SMTP_PASSWORD}
+    volumes:
+      # files/ is next to the compose file in git, mounted as is.
+      - ./files/config.toml:/app/config.toml:ro
+    depends_on: [db]
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      # nginx.conf is rendered from files/nginx.conf.tmpl
+      - ./files/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./files/static:/usr/share/nginx/html:ro
+    networks: [default, proxy]
+
+secrets:
+  db_password:
+    file: ${secretfile.DB_PASSWORD}
+
+volumes:
+  db:
+
+networks:
+  proxy:
+    external: true   # created by minato when missing
