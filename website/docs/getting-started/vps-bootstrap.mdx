@@ -1,0 +1,155 @@
+---
+title: Fresh VPS setup
+---
+
+import BootstrapBuilder from '@site/src/components/BootstrapBuilder';
+
+# Fresh VPS setup
+
+One script turns a freshly created Debian or Ubuntu server into a hardened
+Docker host running Minato. Run it once, right after creating the server, as
+root. Pick your options, the command follows:
+
+<BootstrapBuilder />
+
+Supported systems: Debian 12 and newer, Ubuntu 22.04 and newer, amd64 and
+arm64. Read the script before running it as root:
+[bootstrap.sh](pathname:///minato/bootstrap.sh). It can run again safely, for
+example to open a port.
+
+:::warning Keep your session open
+
+At the end, SSH only accepts keys, for the admin user only. Log in from a
+**new terminal** with the command the script prints before closing the current
+session.
+
+:::
+
+## What it does
+
+In order:
+
+1. **Upgrades the system** (`apt full-upgrade`) and installs the tools it needs.
+2. **Time**: time zone (UTC by default) and NTP.
+3. **Swap**: a 2 GB swap file when the server has less than 4 GB of RAM and no swap.
+4. **Automatic updates** with unattended-upgrades: security and stable
+   updates of the distribution, and Docker. When an update needs it, the
+   server reboots at 04:00.
+5. **Admin user** with sudo and your SSH keys. It has no password, so sudo
+   does not ask for one.
+6. **Kernel hardening** with sysctl:
+   - no ICMP redirects or source routing, spoofed packets logged, SYN cookies;
+   - kernel pointers and logs hidden, ptrace and unprivileged eBPF restricted;
+   - no core dumps;
+   - rare file systems and network protocols disabled.
+7. **Logs**: a persistent journal, capped at 500 MB and one month.
+8. **AppArmor** enabled.
+9. **Docker** from the official repository:
+   - `no-new-privileges` and `icc=false` for every container;
+   - rotated logs, so a chatty container cannot fill the disk.
+10. **Docker Swarm**: a single node swarm. Its ports stay closed.
+11. **Firewall** (UFW): incoming traffic to the server is denied, except SSH
+    (rate limited) and the ports you open. Ports published by containers
+    follow your compose files, unless you filter them too.
+12. **Fail2ban**: SSH bans of one hour that grow up to one week for repeat
+    offenders.
+13. **Minato**: installed and, with a repository, configured with
+    `minato server init`, a deploy key, your user as admin (SSH keys only) and
+    the systemd service.
+14. **SSH hardening**, last:
+    - keys only, no root login, only the admin user;
+    - modern algorithms, optional port change.
+
+The whole output is saved in `/var/log/minato-bootstrap.log`.
+
+## Reaching Minato from outside
+
+The remote API and the webhooks are not exposed directly by default. Pick one
+of these:
+
+- **A domain behind your reverse proxy** (recommended). With `--domain`,
+  Minato listens on `127.0.0.1:7373` without TLS, and your reverse proxy serves
+  it on the domain with its certificate. With Traefik in host network mode, a
+  file provider route is enough:
+
+  ```yaml title="/etc/traefik/dynamic/minato.yml"
+  http:
+    routers:
+      minato:
+        rule: Host(`minato.example.com`)
+        entryPoints: [websecure]
+        tls: { certResolver: letsencrypt }
+        service: minato
+    services:
+      minato:
+        loadBalancer:
+          servers: [{ url: "http://127.0.0.1:7373" }]
+  ```
+
+- **A domain, certificate by Minato** (`--tls acme`): Minato takes ports 80
+  and 443 itself. Only on a server without a reverse proxy.
+- **Port 7373** (`--open-api-port`): self-signed certificate, pinned by
+  `minato login`.
+- **Private**: nothing is opened. Use the CLI on the server, or an SSH tunnel
+  from your laptop: `ssh -L 7373:127.0.0.1:7373 you@server`, then
+  `minato login https://localhost:7373`.
+
+## Ports
+
+The firewall only opens SSH on the server itself. Two cases need more:
+
+- **A service listening on the server**, like a reverse proxy in host network
+  mode: open its ports with `--allow-port 80/tcp --allow-port 443/tcp`.
+- **Containers publishing ports** (`ports: ["443:443"]`): Docker opens them
+  itself, the firewall does not block them. Your compose files decide what is
+  exposed, so bind private services to the loopback address:
+  `ports: ["127.0.0.1:5432:5432"]`.
+
+To make the firewall apply to containers too, use `--filter-docker-ports`: a
+published port is then only reachable if it is listed with `--allow-port`.
+
+Each run sets the firewall from its options: a port opened by an earlier run
+and not passed again is closed. Rules you add yourself with `ufw` are kept.
+
+## Options
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--user NAME` | required | admin user to create |
+| `--ssh-key KEY` | keys of root | allowed public key, or `@file`, repeatable |
+| `--ssh-port PORT` | `22` | SSH port |
+| `--allow-port PORT[/tcp\|udp]` | | open a port of the server, repeatable |
+| `--filter-docker-ports` | | apply the firewall to ports published by containers |
+| `--timezone TZ` | `UTC` | time zone |
+| `--swap SIZE` | auto | swap file size, `0` to skip |
+| `--reboot-time HH:MM` | `04:00` | automatic reboot time after updates, `off` to never reboot |
+| `--reboot` | | reboot at the end if an update needs it |
+| `--no-swarm` | | plain Docker, no swarm |
+| `--swarm-addr IP` | main IPv4 | swarm advertise address |
+| `--no-docker-hardening` | | keep the Docker defaults for `no-new-privileges` and `icc` |
+| `--no-minato` | | do not install Minato |
+| `--minato-version VER` | latest | Minato version to install |
+| `--repo URL` | | GitOps repository, runs `minato server init` |
+| `--branch NAME` | `main` | branch to track |
+| `--domain NAME` | | domain of the API and webhooks, implies `--tls off` |
+| `--tls MODE` | | `off`, `self-signed` or `acme`, see [server and TLS](../remote/server.md) |
+| `--open-api-port` | | open port 7373 for the API and webhooks |
+
+## After the script
+
+1. Log in as the admin user from a new terminal.
+2. With a repository, add the printed **deploy key** to it, and the **server
+   age key** to `.minato.yml`.
+3. With a domain, route it to Minato from your reverse proxy.
+4. Reboot if the script says so: `sudo reboot`.
+
+## Things to know
+
+- **No new privileges.** A container whose entrypoint relies on `sudo` or a
+  setuid binary fails with this setting. Uncheck the container hardening, or
+  set `security_opt: ["no-new-privileges=false"]` on that service.
+- **Default bridge isolation.** `icc=false` only isolates containers on the
+  default bridge. Compose and swarm networks work as usual.
+- **Containers restart during Docker updates.** Unattended upgrades update
+  Docker too, which restarts running containers. The swarm mode does not allow
+  the `live-restore` option that would avoid it.

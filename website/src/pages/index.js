@@ -228,11 +228,12 @@ git push -u origin main`}</code>
             </pre>
           </figure>
           <figure className={styles.snippet}>
-            <figcaption>your server</figcaption>
+            <figcaption>a fresh VPS: hardened, with Docker, Swarm and Minato</figcaption>
             <pre>
-              <code>{`sudo minato server init \\
+              <code>{`curl -fsSL https://ermos.github.io/minato/bootstrap.sh -o bootstrap.sh
+sudo bash bootstrap.sh --user you \\
   --repo git@github.com:you/infra.git \\
-  --generate-ssh-key --systemd`}</code>
+  --domain minato.example.com`}</code>
             </pre>
           </figure>
         </div>
