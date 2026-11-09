@@ -78,6 +78,7 @@ export default function BootstrapBuilder() {
     filterDocker: false,
     swarm: true,
     dockerHardening: true,
+    hostname: '',
     timezone: 'UTC',
     autoReboot: true,
     rebootTime: '04:00',
@@ -103,6 +104,7 @@ export default function BootstrapBuilder() {
     if (!s.swarm) args.push(['--no-swarm']);
     if (!s.dockerHardening) args.push(['--no-docker-hardening']);
 
+    if (s.hostname.trim()) args.push(['--hostname', s.hostname.trim().toLowerCase()]);
     if (s.timezone.trim() && s.timezone.trim() !== 'UTC') args.push(['--timezone', s.timezone.trim()]);
     if (s.swap !== 'auto') args.push(['--swap', s.swap]);
     if (!s.autoReboot) args.push(['--reboot-time', 'off']);
@@ -234,6 +236,9 @@ export default function BootstrapBuilder() {
 
         <fieldset className={styles.group}>
           <legend>System</legend>
+          <Field label="Server name" help="Empty: keep the name given by the provider.">
+            <input type="text" value={s.hostname} onChange={onText('hostname')} placeholder="kizuna-prod" autoComplete="off" spellCheck="false" />
+          </Field>
           <Field label="Time zone">
             <input type="text" value={s.timezone} onChange={onText('timezone')} placeholder="UTC" spellCheck="false" />
           </Field>

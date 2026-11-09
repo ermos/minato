@@ -26,6 +26,7 @@ SSH_PORT=22
 EXTRA_PORTS=()
 FILTER_DOCKER_PORTS=false
 OPEN_API_PORT=false
+NEW_HOSTNAME=""
 TIMEZONE="UTC"
 SWAP_SIZE="auto"
 REBOOT_TIME="04:00"
@@ -64,6 +65,7 @@ Access
                            `ports:` of your compose files decide, as Docker does.
 
 System
+  --hostname NAME          rename the server, e.g. kizuna-prod or kizuna-prod.example.com.
   --timezone TZ            time zone (default UTC).
   --swap SIZE              swap file size, e.g. 2G, 0 to skip (default: 2G when the
                            server has less than 4 GB of RAM and no swap).
@@ -115,6 +117,7 @@ parse_args() {
       --allow-port) need_value "$@"; EXTRA_PORTS+=("$2"); shift 2 ;;
       --filter-docker-ports) FILTER_DOCKER_PORTS=true; shift ;;
       --open-api-port) OPEN_API_PORT=true; shift ;;
+      --hostname) need_value "$@"; NEW_HOSTNAME="${2,,}"; shift 2 ;;
       --timezone) need_value "$@"; TIMEZONE="$2"; shift 2 ;;
       --swap) need_value "$@"; SWAP_SIZE="$2"; shift 2 ;;
       --reboot-time) need_value "$@"; REBOOT_TIME="$2"; shift 2 ;;
@@ -179,6 +182,11 @@ preflight() {
   [[ "$OPEN_API_PORT" == false || "$TLS" != off ]] || die "--open-api-port is useless with --tls off (the API listens on 127.0.0.1)"
   [[ -z "$MINATO_BINARY" || -f "$MINATO_BINARY" ]] || die "$MINATO_BINARY not found"
   [[ -e "/usr/share/zoneinfo/$TIMEZONE" ]] || die "unknown time zone $TIMEZONE"
+  if [[ -n "$NEW_HOSTNAME" ]]; then
+    local label='[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?'
+    [[ ${#NEW_HOSTNAME} -le 253 && "$NEW_HOSTNAME" =~ ^$label(\.$label)*$ ]] \
+      || die "invalid --hostname $NEW_HOSTNAME (letters, digits and hyphens, dots between labels)"
+  fi
 
   collect_keys
 }
@@ -242,6 +250,37 @@ upgrade_system() {
     unattended-upgrades apt-listchanges needrestart \
     apparmor apparmor-utils logrotate
   apt-get "${APT_OPTS[@]}" autoremove --purge
+}
+
+setup_hostname() {
+  [[ -n "$NEW_HOSTNAME" ]] || return 0
+  step "Hostname"
+  local old short names
+  old="$(hostname)"
+  short="${NEW_HOSTNAME%%.*}"
+  names="$NEW_HOSTNAME"
+  [[ "$short" == "$NEW_HOSTNAME" ]] || names="$NEW_HOSTNAME $short"
+
+  if ! hostnamectl set-hostname "$NEW_HOSTNAME" 2>/dev/null; then
+    printf '%s\n' "$NEW_HOSTNAME" > /etc/hostname
+    hostname "$NEW_HOSTNAME"
+  fi
+  # sudo and some tools resolve the host name: keep it in /etc/hosts.
+  if grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts; then
+    sed -i -E "s/^127\.0\.1\.1[[:space:]].*/127.0.1.1 $names/" /etc/hosts
+  else
+    printf '127.0.1.1 %s\n' "$names" >> /etc/hosts
+  fi
+  # Cloud images reset the name and /etc/hosts from the provider on every boot.
+  if [[ -d /etc/cloud/cloud.cfg.d ]]; then
+    printf '%s\npreserve_hostname: true\nmanage_etc_hosts: false\n' "$MARK" \
+      > /etc/cloud/cloud.cfg.d/99-minato-hostname.cfg
+  fi
+  if [[ "$old" == "$NEW_HOSTNAME" ]]; then
+    info "$NEW_HOSTNAME"
+  else
+    info "$old renamed to $NEW_HOSTNAME"
+  fi
 }
 
 setup_time() {
@@ -801,6 +840,7 @@ main() {
   printf '\n\033[1mMinato VPS bootstrap\033[0m (%s)\n' "$(date -u +%FT%TZ)"
   preflight
   upgrade_system
+  setup_hostname
   setup_time
   setup_swap
   setup_unattended_upgrades
