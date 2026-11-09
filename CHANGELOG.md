@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/ermos/minato/compare/v0.1.0...v0.2.0) (2026-11-09)
+
+
+### Features
+
+* **secrets:** share secrets between stacks ([#8](https://github.com/ermos/minato/issues/8)) ([1a2103e](https://github.com/ermos/minato/commit/1a2103e95138164a4f7e25ddaae1be7830a55a24))
+* **update:** add a self-update command with daily automatic updates ([#9](https://github.com/ermos/minato/issues/9)) ([eb6f9dc](https://github.com/ermos/minato/commit/eb6f9dcd8aaceefa0604d899fa5f601ce84d3332))
+
 ## 0.1.0 (2026-11-09)
 
 
