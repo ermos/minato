@@ -1,7 +1,20 @@
-# Minato
+<p align="center">
+  <img src="website/static/img/seal.svg" alt="Minato seal" width="96">
+</p>
+
+<h1 align="center">Minato</h1>
+
+<p align="center">
+  <a href="https://github.com/ermos/minato/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ermos/minato/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/ermos/minato/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/ermos/minato?sort=semver"></a>
+  <a href="LICENSE"><img alt="License: AGPL v3" src="https://img.shields.io/badge/license-AGPL%20v3-2c5d8f"></a>
+  <a href="https://ermos.github.io/minato/"><img alt="Documentation" src="https://img.shields.io/badge/docs-ermos.github.io%2Fminato-2c5d8f"></a>
+</p>
 
 > 港 *minato*, "harbor": where ships and their containers dock.
 > GitOps for Docker Compose and Docker Swarm on a VPS. One binary, no UI, no database.
+
+**Documentation: [ermos.github.io/minato](https://ermos.github.io/minato/)**
 
 Minato keeps the stacks of a server in sync with a git repository. Push a
 change, Minato pulls it, renders it (secrets, variables, templates, files) and
@@ -357,11 +370,19 @@ Server administration (on the VPS, as root)
 - Tokens and signatures are compared in constant time, unknown stacks and hooks answer 401.
 - The daemon runs as root because it drives docker: treat write access to the repository, and the `operator` role, as root access to the server.
 
-## Development
+## Contributing
 
 ```sh
-make test lint build
+make fmt lint test build   # bin/minato
+make docs-serve            # documentation site on localhost:3000
 ```
+
+Pull requests are squash merged and their title becomes the commit on `main`,
+so titles follow [Conventional Commits](https://www.conventionalcommits.org)
+(`feat(secrets): ...`, `fix(webhook): ...`). Releases are automatic:
+release-please opens a release pull request with the next semver version and
+the changelog, and merging it publishes the binaries with GoReleaser. See the
+[contributing guide](https://ermos.github.io/minato/docs/contributing).
 
 ## License
 

@@ -1,0 +1,99 @@
+/*
+ * Minato theme. Indigo dye (aizome) and Prussian blue for the harbor water,
+ * vermilion reserved for the seal.
+ */
+
+:root {
+  --mn-ink: #17233b;
+  --mn-indigo: #1f3a5f;
+  --mn-prussian: #2c5d8f;
+  --mn-water: #e8eff5;
+  --mn-fog: #c7d5e2;
+  --mn-paper: #f7f9fb;
+  --mn-seal: #c23a2c;
+  --mn-muted: #4b5d75;
+  --mn-code-bg: #17233b;
+  --mn-code-fg: #dce5ee;
+  --mn-code-dim: #8fa3bb;
+  --mn-dock: #1f3a5f;
+
+  --ifm-color-primary: #2c5d8f;
+  --ifm-color-primary-dark: #285481;
+  --ifm-color-primary-darker: #254f7a;
+  --ifm-color-primary-darkest: #1f4164;
+  --ifm-color-primary-light: #30669d;
+  --ifm-color-primary-lighter: #3269a3;
+  --ifm-color-primary-lightest: #3a78b8;
+
+  --ifm-background-color: var(--mn-paper);
+  --ifm-font-color-base: var(--mn-ink);
+  --ifm-heading-color: var(--mn-ink);
+  --ifm-font-family-base: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  --ifm-heading-font-family: 'Shippori Mincho B1', 'Hiragino Mincho ProN', Georgia, serif;
+  --ifm-font-family-monospace: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ifm-heading-font-weight: 700;
+  --ifm-line-height-base: 1.7;
+  --ifm-code-font-size: 90%;
+  --ifm-navbar-background-color: var(--mn-paper);
+  --ifm-footer-background-color: var(--mn-ink);
+  --ifm-footer-color: #c7d5e2;
+  --ifm-footer-link-color: #dce5ee;
+  --ifm-footer-title-color: #ffffff;
+  --docusaurus-highlighted-code-line-bg: rgba(44, 93, 143, 0.12);
+}
+
+html[data-theme='dark'] {
+  --mn-ink: #dce5ee;
+  --mn-indigo: #b9cde2;
+  --mn-prussian: #8db4de;
+  --mn-water: #101c2e;
+  --mn-fog: #2a3d57;
+  --mn-paper: #0c1626;
+  --mn-muted: #9fb2c8;
+  --mn-code-bg: #15233a;
+  --mn-dock: #13223a;
+
+  --ifm-color-primary: #8db4de;
+  --ifm-color-primary-dark: #74a4d7;
+  --ifm-color-primary-darker: #679cd3;
+  --ifm-color-primary-darkest: #4386c9;
+  --ifm-color-primary-light: #a6c4e5;
+  --ifm-color-primary-lighter: #b3cde9;
+  --ifm-color-primary-lightest: #d9e6f4;
+
+  --ifm-background-color: var(--mn-paper);
+  --ifm-background-surface-color: #101c2e;
+  --ifm-navbar-background-color: var(--mn-paper);
+  --ifm-footer-background-color: #08111e;
+  --docusaurus-highlighted-code-line-bg: rgba(141, 180, 222, 0.15);
+}
+
+.navbar {
+  box-shadow: none;
+  border-bottom: 1px solid var(--mn-fog);
+}
+
+.navbar__title {
+  font-family: var(--ifm-heading-font-family);
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.navbar__logo {
+  height: 1.75rem;
+}
+
+.markdown h1,
+.markdown h2 {
+  letter-spacing: 0.01em;
+}
+
+.markdown blockquote {
+  border-left-color: var(--mn-seal);
+  font-family: var(--ifm-heading-font-family);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
