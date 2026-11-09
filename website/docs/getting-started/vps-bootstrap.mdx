@@ -55,7 +55,9 @@ In order:
     offenders.
 13. **Minato**: installed and, with a repository, configured with
     `minato server init`, a deploy key, your user as admin (SSH keys only) and
-    the systemd service.
+    the systemd service. Automatic updates are on: every day around 05:00, a
+    systemd timer installs the new release of the same major version and
+    restarts the service (`minato update auto`).
 14. **SSH hardening**, last:
     - keys only, no root login, only the admin user;
     - modern algorithms, optional port change.
@@ -128,6 +130,7 @@ and not passed again is closed. Rules you add yourself with `ufw` are kept.
 | `--swarm-addr IP` | main IPv4 | swarm advertise address |
 | `--no-docker-hardening` | | keep the Docker defaults for `no-new-privileges` and `icc` |
 | `--no-minato` | | do not install Minato |
+| `--no-auto-update` | | no daily update of Minato |
 | `--minato-version VER` | latest | Minato version to install |
 | `--repo URL` | | GitOps repository, runs `minato server init` |
 | `--branch NAME` | `main` | branch to track |

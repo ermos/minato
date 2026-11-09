@@ -68,6 +68,7 @@ export default function BootstrapBuilder() {
     sshKey: '',
     sshPort: '22',
     minato: true,
+    autoUpdate: true,
     repo: '',
     branch: '',
     apiMode: 'proxy',
@@ -111,6 +112,7 @@ export default function BootstrapBuilder() {
     if (!s.minato) {
       args.push(['--no-minato']);
     } else {
+      if (!s.autoUpdate) args.push(['--no-auto-update']);
       if (s.repo.trim()) {
         args.push(['--repo', s.repo.trim()]);
         if (s.branch.trim() && s.branch.trim() !== 'main') args.push(['--branch', s.branch.trim()]);
@@ -165,6 +167,12 @@ export default function BootstrapBuilder() {
           <Toggle checked={s.minato} onChange={set('minato')} label="Install Minato" />
           {s.minato && (
             <>
+              <Toggle
+                checked={s.autoUpdate}
+                onChange={set('autoUpdate')}
+                label="Keep Minato up to date"
+                help="A daily systemd timer installs new releases of the same major version and restarts the service."
+              />
               <Field label="GitOps repository" help="Runs minato server init with a deploy key and the admin user.">
                 <input type="text" value={s.repo} onChange={onText('repo')} placeholder="git@github.com:you/infra.git" autoComplete="off" spellCheck="false" />
               </Field>

@@ -111,5 +111,6 @@ after "minato login".`,
 		logsCmd(g), psCmd(g), hooksCmd(g), composeCmd(g))
 	add("remote", loginCmd(), logoutCmd(), remoteCmd(), whoamiCmd(g))
 	add("server", serverCmd(g), userCmd(g))
+	root.AddCommand(updateCmd())
 	return root
 }
