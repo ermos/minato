@@ -1,0 +1,6 @@
+services:
+  whoami:
+    image: traefik/whoami:${WHOAMI_TAG:-latest}
+    ports:
+      - "8080:80"
+    command: ["--name", "${vars.NAME}"]

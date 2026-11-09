@@ -1,0 +1,10 @@
+server {
+  listen 80;
+  server_name ${vars.DOMAIN};
+
+  location /static/ { root /usr/share/nginx/html; }
+  location / {
+    proxy_pass http://web:3000;
+    proxy_set_header Host $host;
+  }
+}
