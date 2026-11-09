@@ -208,7 +208,33 @@ type RepoSpec struct {
 		// Recipients able to decrypt the secret files: the server key and
 		// every developer or CI key.
 		Recipients []string `yaml:"recipients"`
+		// Shared is a secret file at the root of the repository whose
+		// values every stack can use, unless the stack file defines the
+		// same key. Defaults to secrets.enc.yml.
+		Shared string `yaml:"shared"`
 	} `yaml:"secrets"`
+}
+
+// DefaultSharedSecrets is the shared secret file at the root of the repository.
+const DefaultSharedSecrets = "secrets.enc.yml"
+
+// SharedSecretsFile returns the path of the shared secret file inside root,
+// whether it exists or not.
+func (s *RepoSpec) SharedSecretsFile(root string) string {
+	name := s.Secrets.Shared
+	if name == "" {
+		name = DefaultSharedSecrets
+	}
+	return filepath.Join(root, filepath.Clean("/"+name))
+}
+
+// SharedSecretsPath returns the path of the shared secret file when it exists.
+func (s *RepoSpec) SharedSecretsPath(root string) string {
+	p := s.SharedSecretsFile(root)
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
 }
 
 // LoadRepoSpec reads <root>/.minato.yml. A missing file returns defaults.

@@ -204,7 +204,12 @@ func composeCmd(g *globals) *cobra.Command {
 			}
 			ids, _ := secrets.LoadIdentities(secrets.DefaultIdentityFiles(cfg.AgeKey)...)
 			outDir := filepath.Join(cfg.StacksDir(), s.Name)
-			b, err := render.Build(s, render.Options{OutDir: outDir, Identities: ids, HostEnv: environ()})
+			b, err := render.Build(s, render.Options{
+				OutDir:        outDir,
+				Identities:    ids,
+				HostEnv:       environ(),
+				SharedSecrets: repoSpec.SharedSecretsPath(cfg.Repo.Dir),
+			})
 			if err != nil {
 				return err
 			}

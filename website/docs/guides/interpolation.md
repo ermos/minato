@@ -9,7 +9,7 @@ file and in every `*.tmpl` file of the stack.
 
 | Syntax | Value |
 | --- | --- |
-| `${secrets.NAME}` | decrypted secret from `secrets.enc.yml` |
+| `${secrets.NAME}` | decrypted secret from the stack `secrets.enc.yml`, or from the [shared file](secrets.md#shared-secrets) of the repository |
 | `${secretfile.NAME}` | absolute path of a file containing the secret, for compose `secrets:` |
 | `${vars.NAME}` | value from `vars` in `minato.yml` |
 | `${env.NAME}` | environment variable of the daemon |

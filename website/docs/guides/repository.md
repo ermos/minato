@@ -7,6 +7,7 @@ title: Repository layout
 ```
 infra/
 ├── .minato.yml               # repository settings: stacks dir, secret recipients
+├── secrets.enc.yml           # optional secrets shared by every stack
 └── stacks/
     ├── blog/
     │   ├── compose.yml       # a regular compose file
@@ -35,6 +36,8 @@ secrets:
 
 `recipients` lists the age (or `ssh-ed25519` / `ssh-rsa`) public keys allowed
 to decrypt the secrets of the repository. The server key must be in the list.
+`shared` names the [shared secret file](secrets.md#shared-secrets),
+`secrets.enc.yml` by default.
 
 ## `minato init`
 

@@ -81,6 +81,7 @@ Requirements on the server: Linux, `docker` with the compose plugin, `git`.
 ```
 infra/
 ├── .minato.yml               # repo settings: stacks dir, secret recipients
+├── secrets.enc.yml           # optional secrets shared by every stack
 └── stacks/
     ├── blog/
     │   ├── compose.yml       # a regular compose file
@@ -148,7 +149,7 @@ webhooks:
 
 | Syntax | Value |
 | --- | --- |
-| `${secrets.NAME}` | decrypted secret from `secrets.enc.yml` |
+| `${secrets.NAME}` | decrypted secret from the stack `secrets.enc.yml`, or from the shared one at the repo root |
 | `${secretfile.NAME}` | absolute path of a file containing the secret, for compose `secrets:` |
 | `${vars.NAME}` | value from `vars` in `minato.yml` |
 | `${env.NAME}` | environment variable of the daemon |
@@ -190,9 +191,13 @@ Every `minato secrets` command takes a **target**:
   laptop, the deploy key needs write access.
 - a **file path** (`stacks/blog/secrets.enc.yml`): edited in your working
   copy with your own age key, you commit and push.
+- **`@shared`**: the shared file at the root of the repository
+  (`secrets.enc.yml`), whose values every stack can use. A key defined in a
+  stack file wins. Changing a shared value redeploys only the stacks using it.
 
 ```sh
 minato secrets set blog DB_PASSWORD --random 32       # operator
+minato secrets set @shared POSTGRES_PASSWORD           # shared by every stack
 cat cert.pem | minato secrets set blog TLS_CERT
 minato secrets ls blog                                 # names only, viewer
 minato secrets get blog DB_PASSWORD                    # admin

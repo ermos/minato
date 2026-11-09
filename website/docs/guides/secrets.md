@@ -40,6 +40,9 @@ laptop, but the deploy key needs write access to the repository.
 **A file path** (`stacks/blog/secrets.enc.yml`): the file is edited in your
 working copy with your own age key, then you commit and push.
 
+**`@shared`**: the [shared file](#shared-secrets) of the repository, through
+the server like a stack.
+
 ```bash
 minato secrets set blog DB_PASSWORD --random 32       # operator
 cat cert.pem | minato secrets set blog TLS_CERT
@@ -53,6 +56,26 @@ minato secrets rotate blog --value DB_PASSWORD         # regenerate a value
 minato secrets keygen                                  # ~/.config/minato/age.key
 minato secrets edit stacks/blog/secrets.enc.yml        # local mode
 minato secrets encrypt plain.yml -o stacks/blog/secrets.enc.yml
+```
+
+## Shared secrets
+
+A secret used by several stacks, like a database password, lives once in the
+shared file at the root of the repository: `secrets.enc.yml`. Every stack can
+use its values with the same `${secrets.NAME}`. When a stack file defines the
+same key, the stack value wins.
+
+```bash
+minato secrets set @shared POSTGRES_PASSWORD --random 32   # through the server
+minato secrets set secrets.enc.yml POSTGRES_PASSWORD        # local working copy
+```
+
+Changing a shared value redeploys only the stacks that use it. Another file
+name can be set in `.minato.yml`:
+
+```yaml
+secrets:
+  shared: shared.enc.yml
 ```
 
 ## Keys

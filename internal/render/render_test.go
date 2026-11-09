@@ -192,3 +192,35 @@ func inode(t *testing.T, p string) uint64 {
 	}
 	return info.Sys().(*syscall.Stat_t).Ino
 }
+
+func TestSharedSecrets(t *testing.T) {
+	dir := writeStack(t, map[string]string{
+		"compose.yml": "services:\n  web:\n    image: nginx\n    environment:\n      DB: ${secrets.DB_PASSWORD}\n      TOKEN: ${secrets.TOKEN}\n    secrets: [db]\nsecrets:\n  db:\n    file: ${secretfile.DB_PASSWORD}\n",
+	})
+	stackID := encryptSecrets(t, dir, map[string]string{"TOKEN": "from-stack"})
+	sharedDir := t.TempDir()
+	sharedID := encryptSecrets(t, sharedDir, map[string]string{"DB_PASSWORD": "shared-pg", "TOKEN": "from-shared"})
+	shared := filepath.Join(sharedDir, stack.DefaultSecretsFile)
+
+	st, _ := stack.Load(dir)
+	out := t.TempDir()
+	b, err := Build(st, Options{OutDir: out, Identities: []age.Identity{stackID, sharedID}, SharedSecrets: shared})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compose := string(b.Files[b.ComposePath].Data)
+	if !strings.Contains(compose, "DB: shared-pg") {
+		t.Errorf("shared secret not used:\n%s", compose)
+	}
+	if !strings.Contains(compose, "TOKEN: from-stack") {
+		t.Errorf("the stack value must win over the shared one:\n%s", compose)
+	}
+	if got := string(b.Files[".minato/secrets/DB_PASSWORD"].Data); got != "shared-pg" {
+		t.Errorf("secretfile of a shared secret = %q", got)
+	}
+
+	// Validation needs no key and sees the shared keys.
+	if _, err := Build(st, Options{OutDir: out, Redact: true, SharedSecrets: shared}); err != nil {
+		t.Fatalf("redacted build: %v", err)
+	}
+}

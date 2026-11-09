@@ -39,6 +39,9 @@ type Options struct {
 	// Redact replaces secrets with placeholders and does not need any key.
 	// Used for validation and previews.
 	Redact bool
+	// SharedSecrets is the shared secret file of the repository, empty when
+	// there is none. Its values are used unless the stack file has the key.
+	SharedSecrets string
 }
 
 // File is a rendered file.
@@ -209,11 +212,26 @@ func Build(st *stack.Stack, opts Options) (*Bundle, error) {
 	return b, nil
 }
 
+// loadSecrets returns the shared secrets of the repository overlaid with the
+// secrets of the stack.
 func loadSecrets(st *stack.Stack, opts Options) (map[string]string, error) {
-	p := st.SecretsPath()
-	if p == "" {
-		return map[string]string{}, nil
+	out := map[string]string{}
+	for _, p := range []string{opts.SharedSecrets, st.SecretsPath()} {
+		if p == "" {
+			continue
+		}
+		values, err := readSecretFile(st, p, opts)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range values {
+			out[k] = v
+		}
 	}
+	return out, nil
+}
+
+func readSecretFile(st *stack.Stack, p string, opts Options) (map[string]string, error) {
 	if opts.Redact {
 		e, err := secrets.ReadFile(p)
 		if err != nil {
@@ -228,7 +246,11 @@ func loadSecrets(st *stack.Stack, opts Options) (map[string]string, error) {
 	if len(opts.Identities) == 0 {
 		return nil, fmt.Errorf("stack %s has secrets but no age identity is available", st.Name)
 	}
-	return secrets.DecryptFile(p, opts.Identities)
+	values, err := secrets.DecryptFile(p, opts.Identities)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Base(p), err)
+	}
+	return values, nil
 }
 
 // readFile returns the content of a file referenced by the compose file,
