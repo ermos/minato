@@ -1,0 +1,22 @@
+mode: compose          # or swarm
+
+vars:
+  DOMAIN: blog.example.com
+
+# Exported to compose, usable as ${NAME} in compose.yml.
+env:
+  TAG: "1.4.2"
+  DATABASE_URL: postgres://blog:${secrets.DB_PASSWORD}@db/blog
+
+files:
+  on_change: restart   # restart services mounting a changed file
+
+deploy:
+  pull: missing        # missing | always | never
+  wait: false
+
+webhooks:
+  release:
+    action: pull
+    services: [web]
+    token: ${secrets.HOOK_TOKEN}
