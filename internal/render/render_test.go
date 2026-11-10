@@ -224,3 +224,33 @@ func TestSharedSecrets(t *testing.T) {
 		t.Fatalf("redacted build: %v", err)
 	}
 }
+
+func TestRolloutRejectsPinnedServices(t *testing.T) {
+	for _, c := range []struct {
+		name, service, want string
+	}{
+		{"free", "  api:\n    image: app\n    ports: [\"8787\"]\n", ""},
+		{"container name", "  api:\n    image: app\n    container_name: api\n", "has container_name"},
+		{"host port", "  api:\n    image: app\n    ports: [\"8080:8787\"]\n", "published host port"},
+		{"long syntax", "  api:\n    image: app\n    ports:\n      - target: 8787\n        published: 8080\n", "published host port"},
+		{"unknown", "  web:\n    image: app\n", "unknown service \"api\""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := writeStack(t, map[string]string{
+				"compose.yml": "services:\n" + c.service,
+				"minato.yml":  "deploy:\n  rollout:\n    api: {}\n",
+			})
+			st, err := stack.Load(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = Build(st, Options{OutDir: t.TempDir()})
+			if c.want == "" && err != nil {
+				t.Fatal(err)
+			}
+			if c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)) {
+				t.Fatalf("expected %q, got %v", c.want, err)
+			}
+		})
+	}
+}

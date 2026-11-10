@@ -65,34 +65,46 @@ func checkServices(b *render.Bundle, services []string) error {
 	return nil
 }
 
+func composeBase(b *render.Bundle) []string {
+	return []string{"compose", "-p", b.Stack.Project(), "-f", filepath.Join(b.OutDir, b.ComposePath)}
+}
+
 func (c *Client) runCompose(ctx context.Context, b *render.Bundle, action Action, services []string, out io.Writer) error {
-	base := []string{"compose", "-p", b.Stack.Project(), "-f", filepath.Join(b.OutDir, b.ComposePath)}
-	var args []string
-	switch action {
-	case ActionDeploy:
+	if roll, rest := splitRollout(b, action, services); len(roll) > 0 {
+		return c.composeRollout(ctx, b, action, roll, rest, out)
+	}
+	if action == ActionDeploy {
 		if err := c.ensureNetworks(ctx, b, out); err != nil {
 			return err
 		}
-		args = append(base, "up", "-d", "--remove-orphans", "--pull", b.Stack.Spec.Deploy.Pull)
-		if b.Stack.Spec.Deploy.Wait {
-			args = append(args, "--wait")
-		}
-	case ActionPull:
-		args = append(base, "up", "-d", "--pull", "always")
-		if b.Stack.Spec.Deploy.Wait {
-			args = append(args, "--wait")
-		}
-	case ActionRestart:
-		args = append(base, "restart")
-	case ActionRecreate:
-		args = append(base, "up", "-d", "--force-recreate")
-	case ActionDown:
-		args = append(base, "down", "--remove-orphans")
 	}
+	args := append(composeBase(b), composeArgs(b, action)...)
 	if action != ActionDown {
 		args = append(args, services...)
 	}
 	return c.exec(ctx, b, out, args...)
+}
+
+// composeArgs returns the docker compose arguments of an action, without the
+// service list.
+func composeArgs(b *render.Bundle, action Action) []string {
+	var args []string
+	switch action {
+	case ActionDeploy:
+		args = []string{"up", "-d", "--remove-orphans", "--pull", b.Stack.Spec.Deploy.Pull}
+	case ActionPull:
+		args = []string{"up", "-d", "--pull", "always"}
+	case ActionRestart:
+		return []string{"restart"}
+	case ActionRecreate:
+		return []string{"up", "-d", "--force-recreate"}
+	case ActionDown:
+		return []string{"down", "--remove-orphans"}
+	}
+	if b.Stack.Spec.Deploy.Wait {
+		args = append(args, "--wait")
+	}
+	return args
 }
 
 func (c *Client) runSwarm(ctx context.Context, b *render.Bundle, action Action, services []string, out io.Writer) error {

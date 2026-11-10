@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -76,6 +78,37 @@ type Deploy struct {
 	Pull string `yaml:"pull"`
 	// Wait for services to be healthy / converged.
 	Wait bool `yaml:"wait"`
+	// Rollout lists the compose services updated without downtime, keyed by
+	// service name: the new container starts next to the old one, which is
+	// only stopped once the new one is ready.
+	Rollout map[string]Rollout `yaml:"rollout"`
+}
+
+// Rollout configures the rolling update of a compose service.
+type Rollout struct {
+	// Probe is an HTTP check minato runs against the new container. Without
+	// it, the healthcheck of the container is used when it has one, otherwise
+	// the container only has to stay up for 10 seconds.
+	Probe *Probe `yaml:"probe"`
+	// Timeout for the new container to be ready (default 2m).
+	Timeout string `yaml:"timeout"`
+	// Drain is the time both versions run once the new one is ready, so a
+	// reverse proxy routes to it before the old one stops (default 5s).
+	Drain string `yaml:"drain"`
+
+	timeout, drain time.Duration
+}
+
+// TimeoutDuration returns the parsed timeout.
+func (r Rollout) TimeoutDuration() time.Duration { return r.timeout }
+
+// DrainDuration returns the parsed drain time.
+func (r Rollout) DrainDuration() time.Duration { return r.drain }
+
+// Probe is an HTTP GET on the container IP, ready on a 2xx answer.
+type Probe struct {
+	Port int    `yaml:"port"`
+	Path string `yaml:"path"`
 }
 
 // Webhook is a stack level hook exposed on /hooks/<stack>/<name>.
@@ -194,6 +227,30 @@ func (s *Stack) applyDefaults() error {
 	default:
 		return fmt.Errorf("deploy.pull: unknown value %q", sp.Deploy.Pull)
 	}
+	if len(sp.Deploy.Rollout) > 0 && sp.Mode == ModeSwarm {
+		return errors.New("deploy.rollout is for compose mode, swarm rolls out with deploy.update_config in the compose file")
+	}
+	for svc, r := range sp.Deploy.Rollout {
+		var err error
+		if r.timeout, err = duration(r.Timeout, 2*time.Minute); err != nil {
+			return fmt.Errorf("deploy.rollout.%s.timeout: %w", svc, err)
+		}
+		if r.drain, err = duration(r.Drain, 5*time.Second); err != nil {
+			return fmt.Errorf("deploy.rollout.%s.drain: %w", svc, err)
+		}
+		if r.Probe != nil {
+			if r.Probe.Port < 1 || r.Probe.Port > 65535 {
+				return fmt.Errorf("deploy.rollout.%s.probe.port: invalid port %d", svc, r.Probe.Port)
+			}
+			if r.Probe.Path == "" {
+				r.Probe.Path = "/"
+			}
+			if !strings.HasPrefix(r.Probe.Path, "/") {
+				return fmt.Errorf("deploy.rollout.%s.probe.path must start with /", svc)
+			}
+		}
+		sp.Deploy.Rollout[svc] = r
+	}
 	for name, h := range sp.Webhooks {
 		if !namePattern.MatchString(name) {
 			return fmt.Errorf("webhook %q: invalid name", name)
@@ -208,6 +265,18 @@ func (s *Stack) applyDefaults() error {
 		}
 	}
 	return nil
+}
+
+// duration parses s, or returns def when s is empty.
+func duration(s string, def time.Duration) (time.Duration, error) {
+	if s == "" {
+		return def, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 0 {
+		return 0, fmt.Errorf("invalid duration %q", s)
+	}
+	return d, nil
 }
 
 // Discover loads every stack under root (one folder per stack). Folders

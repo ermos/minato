@@ -22,12 +22,15 @@ type Compose struct {
 	Mounts map[string][]string
 	// ExternalNetworks must exist before deploying.
 	ExternalNetworks []string
+	// pinned maps services to the setting that prevents running two of their
+	// containers side by side.
+	pinned map[string]string
 }
 
 // ParseCompose parses a rendered compose file. env is used to expand compose
 // ${VAR} references in the fields minato reads.
 func ParseCompose(data []byte, env map[string]string) (*Compose, error) {
-	c := &Compose{raw: map[string]any{}, Images: map[string]string{}, Mounts: map[string][]string{}}
+	c := &Compose{raw: map[string]any{}, Images: map[string]string{}, Mounts: map[string][]string{}, pinned: map[string]string{}}
 	if err := yaml.Unmarshal(data, &c.raw); err != nil {
 		return nil, fmt.Errorf("parse compose: %w", err)
 	}
@@ -50,6 +53,14 @@ func ParseCompose(data []byte, env map[string]string) (*Compose, error) {
 		svc := asMap(def)
 		if img, ok := svc["image"].(string); ok {
 			c.Images[name] = expand(img)
+		}
+		if _, ok := svc["container_name"]; ok {
+			c.pinned[name] = "container_name"
+		}
+		for _, p := range asSlice(svc["ports"]) {
+			if publishesHostPort(p) {
+				c.pinned[name] = "a published host port"
+			}
 		}
 		for _, v := range asSlice(svc["volumes"]) {
 			var src string
@@ -95,6 +106,31 @@ func ParseCompose(data []byte, env map[string]string) (*Compose, error) {
 	}
 	sort.Strings(c.ExternalNetworks)
 	return c, nil
+}
+
+// CheckRollout reports why svc cannot run two containers side by side during
+// a rolling update.
+func (c *Compose) CheckRollout(svc string) error {
+	if _, ok := asMap(c.raw["services"])[svc]; !ok {
+		return fmt.Errorf("deploy.rollout: unknown service %q", svc)
+	}
+	if why := c.pinned[svc]; why != "" {
+		return fmt.Errorf("deploy.rollout: service %s has %s, its old and new containers would conflict", svc, why)
+	}
+	return nil
+}
+
+// publishesHostPort reports whether a compose ports entry binds a host port:
+// "8080:80" or {published: 8080} do, "80" does not.
+func publishesHostPort(p any) bool {
+	switch v := p.(type) {
+	case string:
+		return strings.Contains(v, ":")
+	case map[string]any:
+		_, ok := v["published"]
+		return ok
+	}
+	return false
 }
 
 // Services returns the sorted service names.
