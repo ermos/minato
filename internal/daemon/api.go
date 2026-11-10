@@ -22,6 +22,7 @@ import (
 	"github.com/ermos/minato/internal/docker"
 	"github.com/ermos/minato/internal/secrets"
 	"github.com/ermos/minato/internal/stack"
+	"github.com/ermos/minato/internal/sysinfo"
 	"github.com/ermos/minato/internal/tlsutil"
 )
 
@@ -99,6 +100,9 @@ func (d *Daemon) routes() []route {
 	return []route{
 		{"GET /v1/status", auth.RoleViewer, func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, StatusResponse{State: d.Status(), Stacks: d.Stacks()})
+		}},
+		{"GET /v1/system", auth.RoleViewer, func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, http.StatusOK, sysinfo.Collect(r.Context(), d.cfg.Docker.Bin, time.Second))
 		}},
 		{"GET /v1/hooks", auth.RoleViewer, func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, d.Hooks())
