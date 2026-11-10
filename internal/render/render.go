@@ -195,6 +195,11 @@ func Build(st *stack.Stack, opts Options) (*Bundle, error) {
 		return nil, fmt.Errorf("render %s: %w", st.Name, err)
 	}
 	b.Compose = compose
+	for svc := range st.Spec.Deploy.Rollout {
+		if err := compose.CheckRollout(svc); err != nil {
+			return nil, fmt.Errorf("render %s: %w", st.Name, err)
+		}
+	}
 	if st.Spec.Mode == stack.ModeSwarm {
 		changed, err := compose.VersionSwarmObjects(st.Project(), b.readFile)
 		if err != nil {
