@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ermos/minato/internal/daemon"
+	"github.com/ermos/minato/internal/sysinfo"
 	"github.com/ermos/minato/internal/tlsutil"
 )
 
@@ -192,6 +193,12 @@ func stackPath(stack, suffix string) string {
 func (c *Client) Info() (*daemon.Info, error) {
 	var i daemon.Info
 	return &i, c.do(http.MethodGet, "/v1/info", nil, &i)
+}
+
+// System returns the state of the server: CPU, memory, disks, network, GPUs, containers.
+func (c *Client) System() (*sysinfo.Report, error) {
+	var r sysinfo.Report
+	return &r, c.do(http.MethodGet, "/v1/system", nil, &r)
 }
 
 // Whoami returns the authenticated identity.

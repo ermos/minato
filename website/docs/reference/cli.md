@@ -29,6 +29,7 @@ Local socket on the server, or the current remote.
 | Command | Effect |
 | --- | --- |
 | `minato status` | commit, stacks and their status: deployed, out-of-sync, error, disabled, down, orphaned |
+| `minato stats [--watch 5s] [--json]` | state of the server: CPU, memory, swap, disks, network rates, NVIDIA GPUs, and every container with its stack, CPU, memory and network I/O |
 | `minato sync [-f]` | git pull and reconcile now, `-f` redeploys everything |
 | `minato deploy STACK [SERVICE...]` | deploy a stack |
 | `minato pull STACK [SERVICE...]` | pull images and redeploy |

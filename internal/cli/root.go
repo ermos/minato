@@ -102,7 +102,7 @@ after "minato login".`,
 		}
 	}
 	add("repo", repoInitCmd(), secretsCmd(g), renderCmd(g), validateCmd())
-	add("ops", statusCmd(g), syncCmd(g),
+	add("ops", statusCmd(g), statsCmd(g), syncCmd(g),
 		actionCmd(g, "deploy", "Deploy a stack (or some services) from the latest commit"),
 		actionCmd(g, "pull", "Pull fresh images and update a stack or some services"),
 		actionCmd(g, "restart", "Restart a stack or some services"),
