@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ermos/minato/compare/v0.2.0...v0.3.0) (2026-11-10)
+
+
+### Features
+
+* **deploy:** add rolling deploys for compose services ([#12](https://github.com/ermos/minato/issues/12)) ([2eb938d](https://github.com/ermos/minato/commit/2eb938dba6a50206bd49f0b4c87a417c8df889cc))
+
 ## [0.2.0](https://github.com/ermos/minato/compare/v0.1.0...v0.2.0) (2026-11-09)
 
 
