@@ -2,6 +2,8 @@ module github.com/ermos/minato
 
 go 1.26.0
 
+toolchain go1.26.11
+
 require (
 	filippo.io/age v1.3.2
 	github.com/spf13/cobra v1.10.2
