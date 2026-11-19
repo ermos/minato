@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/ermos/minato/compare/v0.3.0...v0.3.1) (2026-11-19)
+
+
+### Bug fixes
+
+* **deps:** bump go toolchain to go1.26.11 for CVE-2026-97040 ([#15](https://github.com/ermos/minato/issues/15)) ([b827fea](https://github.com/ermos/minato/commit/b827fea080b9c674d7538f19b5d5204ad720b44a))
+
 ## [0.3.0](https://github.com/ermos/minato/compare/v0.2.0...v0.3.0) (2026-11-10)
 
 
